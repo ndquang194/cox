@@ -7,6 +7,7 @@ export class MyDefault {
   };
   static TRANSACTION_STATUS = {
     PENDING: 'pending',
+    ON_GOING: 'on_going',
     SUCCESS: 'success',
     CANCELLED: 'cancelled'
   }

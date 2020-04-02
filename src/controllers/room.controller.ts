@@ -16,33 +16,26 @@ import {
   put,
   del,
   requestBody,
-  Request,
-  RequestBody,
-  RestBindings,
-  Response
+  HttpErrors,
 } from '@loopback/rest';
-import { HttpErrors } from '@loopback/rest';
-import { authenticate, TokenService, UserService } from '@loopback/authentication';
-import { inject } from '@loopback/context';
-import { SecurityBindings, securityId, UserProfile } from '@loopback/security';
-import { OPERATION_SECURITY_SPEC } from '../ultils/security-spec';
-import { PasswordHasherBindings, TokenServiceBindings, UserServiceBindings, Path } from '../services/key';
+import { Room, Coworking } from '../models';
+import { RoomRepository, CoworkingRepository, BookingRepository } from '../repositories';
+import { authenticate } from '@loopback/authentication';
 import { authorize } from '@loopback/authorization';
 import { basicAuthorization } from '../services/basic.authorizor';
-import { Room } from '../models';
-import { RoomRepository, UserRepository } from '../repositories';
-import { parseRequest } from '../services/parseRequest';
-import { saveFile } from '../services/storageFile';
+import { inject } from '@loopback/core';
+import { SecurityBindings, securityId, UserProfile } from '@loopback/security';
+import { AppResponse } from '../services/appresponse';
 
 
 export class RoomController {
   constructor(
     @repository(RoomRepository)
     public roomRepository: RoomRepository,
-    @repository(UserRepository)
-    public userRepository: UserRepository,
-    @inject(TokenServiceBindings.TOKEN_SERVICE)
-    public jwtService: TokenService
+    @repository(CoworkingRepository)
+    public coworkingRepository: CoworkingRepository,
+    @repository(BookingRepository)
+    public bookingRepository: BookingRepository,
   ) { }
 
   @authenticate('jwt')
@@ -50,50 +43,35 @@ export class RoomController {
     allowedRoles: ['Admin'],
     voters: [basicAuthorization],
   })
-  @post('/rooms', {
+  @post('coworking/{id}/rooms/add', {
     responses: {
       '200': {
         description: 'Room model instance',
-        content: { 'application/json': { schema: getModelSchemaRef(Room) } },
       },
     },
   })
   async create(
     @requestBody({
-      description: 'Create room',
-      required: true,
       content: {
-        'multipart/form-data': {
-          'x-parser': 'stream',
-          schema: {
-            type: 'object',
-            properties: {
-              room: {
-                type: 'string'
-              }
-            }
-          },
+        'application/json': {
+          schema: getModelSchemaRef(Room, {
+            title: 'NewRoom',
+            exclude: ['id'],
+          }),
         },
       },
     })
-    request: Request,
+    room: Omit<Room, 'id'>,
     @inject(SecurityBindings.USER)
     currentUserProfile: UserProfile,
-    @inject(RestBindings.Http.RESPONSE) response: Response,
-  ): Promise<any> {
-    let req: any = await parseRequest(request, response);
-    if (!req.fields.room)
-      throw new HttpErrors.NotAcceptable('Please submit room');
-    const photo = await saveFile(req.files, Path.images);
-    req.fields.room = JSON.parse(req.fields.room);
-    req.fields.room.photo = photo;
-    let styleRooms: any[] = req.fields.room.styleRooms;
-    delete req.fields.room.styleRooms;
-    let room = await this.userRepository.rooms(currentUserProfile[securityId]).create(req.fields.room);
-    styleRooms.forEach(async (element) => {
-      await this.roomRepository.styleRooms(room.id).create(element);
-    });
-    return room;
+    @param.path.string('id') id: string,
+  ): Promise<AppResponse> {
+    let coworking = await this.coworkingRepository.findById(id);
+    if (!coworking)
+      throw new AppResponse(400, 'Not found coworking');
+    if (coworking.userId != currentUserProfile[securityId])
+      throw new AppResponse(401, 'Access denied');
+    return new AppResponse(200, 'Sucess', await this.coworkingRepository.rooms(id).create(room));
   }
 
   @authenticate('jwt')
@@ -101,89 +79,6 @@ export class RoomController {
     allowedRoles: ['Admin'],
     voters: [basicAuthorization],
   })
-  @get('/rooms', {
-    responses: {
-      '200': {
-        description: 'Array of Room model instances',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'array',
-              items: getModelSchemaRef(Room, { includeRelations: true }),
-            },
-          },
-        },
-      },
-    },
-  })
-  async findRooms(
-    @inject(SecurityBindings.USER)
-    currentUserProfile: UserProfile,
-    @param.query.object('filter', getFilterSchemaFor(Room)) filter?: Filter<Room>,
-  ): Promise<Room[]> {
-    return await this.userRepository.rooms(currentUserProfile[securityId]).find(filter);
-  }
-
-  @get('user/{id}/rooms', {
-    responses: {
-      '200': {
-        description: 'Array of Room model instances',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'array',
-              items: getModelSchemaRef(Room, { includeRelations: true }),
-            },
-          },
-        },
-      },
-    },
-  })
-  async find(@param.path.string('id') id: string,
-    @param.query.object('filter', getFilterSchemaFor(Room)) filter?: Filter<Room>, ): Promise<Room[]> {
-    return this.userRepository.rooms(id).find(filter);
-  }
-
-  @get('/rooms/{id}', {
-    responses: {
-      '200': {
-        description: 'Room model instance',
-        content: {
-          'application/json': {
-            schema: getModelSchemaRef(Room, { includeRelations: true }),
-          },
-        },
-      },
-    },
-  })
-  async findById(
-    @param.path.string('id') id: string,
-    @param.query.object('filter', getFilterSchemaFor(Room)) filter?: Filter<Room>
-  ): Promise<Room> {
-    return this.roomRepository.findById(id, filter);
-  }
-
-  @patch('/rooms/{id}', {
-    responses: {
-      '204': {
-        description: 'Room PATCH success',
-      },
-    },
-  })
-  async updateById(
-    @param.path.string('id') id: string,
-    @requestBody({
-      content: {
-        'application/json': {
-          schema: getModelSchemaRef(Room, { partial: true }),
-        },
-      },
-    })
-    room: Room,
-  ): Promise<void> {
-    await this.roomRepository.updateById(id, room);
-  }
-
   @put('/rooms/{id}', {
     responses: {
       '204': {
@@ -194,10 +89,21 @@ export class RoomController {
   async replaceById(
     @param.path.string('id') id: string,
     @requestBody() room: Room,
-  ): Promise<void> {
+    @inject(SecurityBindings.USER)
+    currentUserProfile: UserProfile,
+  ): Promise<AppResponse> {
+    let coworking = await this.roomRepository.coworking(id);
+    if (coworking.userId != currentUserProfile[securityId])
+      throw new AppResponse(401, "Access denied");
     await this.roomRepository.replaceById(id, room);
+    return new AppResponse(200, 'Update sucess');
   }
 
+  @authenticate('jwt')
+  @authorize({
+    allowedRoles: ['Admin'],
+    voters: [basicAuthorization],
+  })
   @del('/rooms/{id}', {
     responses: {
       '204': {
@@ -205,7 +111,79 @@ export class RoomController {
       },
     },
   })
-  async deleteById(@param.path.string('id') id: string): Promise<void> {
+  async deleteById(
+    @param.path.string('id') id: string,
+    @requestBody() room: Room,
+    @inject(SecurityBindings.USER)
+    currentUserProfile: UserProfile,
+  ): Promise<AppResponse> {
+    let coworking = await this.roomRepository.coworking(id);
+    if (coworking.userId != currentUserProfile[securityId])
+      throw new AppResponse(401, "Access denied");
     await this.roomRepository.deleteById(id);
+    return new AppResponse(200, 'Delete sucess');
+  }
+
+  @authenticate('jwt')
+  @authorize({
+    allowedRoles: ['Admin'],
+    voters: [basicAuthorization],
+  })
+  @get('/rooms/{id}/bookings/history', {
+    responses: {
+      '204': {
+        description: 'Room booking history',
+      },
+    },
+  })
+  async bookingHistory(
+    @param.path.string('id') id: string,
+    @inject(SecurityBindings.USER)
+    currentUserProfile: UserProfile,
+  ): Promise<AppResponse> {
+    if ((await this.roomRepository.coworking(id)).userId != currentUserProfile[securityId])
+      throw new AppResponse(401, "Access denied");
+    let transactionId = (await this.roomRepository.transactions(id).find()).map(e => e.id);
+    let listDate: number[] = [];
+    (await this.bookingRepository.find({ where: { transactionId: { inq: transactionId } } })).forEach(e => {
+      if (listDate.indexOf(e.date_time.getTime()) == -1)
+        listDate.push(e.date_time.getTime());
+    });
+    return new AppResponse(200, 'Success', listDate);
+  }
+
+  @authenticate('jwt')
+  @authorize({
+    allowedRoles: ['Admin'],
+    voters: [basicAuthorization],
+  })
+  @get('/rooms/{id}/bookings/{date}', {
+    responses: {
+      '204': {
+        description: 'Room booking date',
+      },
+    },
+  })
+  async bookingDate(
+    @param.path.string('id') id: string,
+    @param.path.number('date') date: number,
+    @inject(SecurityBindings.USER)
+    currentUserProfile: UserProfile,
+  ): Promise<AppResponse> {
+    if (date == undefined || date <= 0) throw new AppResponse(400, "date invaild");
+    if ((await this.roomRepository.coworking(id)).userId != currentUserProfile[securityId])
+      throw new AppResponse(401, "Access denied");
+    let atransaction: any[] = [];
+    let transactions = await this.roomRepository.transactions(id).find({ include: [{ relation: 'bookings' }], });
+    transactions.forEach(e => {
+      let check = false;
+      e.bookings.forEach(e1 => {
+        if (e1.date_time.getTime() == date)
+          check = true;
+      });
+      if (check)
+        atransaction.push(e);
+    })
+    return new AppResponse(200, 'Success', atransaction);
   }
 }

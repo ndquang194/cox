@@ -1,7 +1,6 @@
-import { Entity, model, property, hasOne, hasMany, belongsTo } from '@loopback/repository';
-import { Service } from './service.model';
-import { StyleRoom, StyleRoomWithRelations } from './style-room.model';
-import { User, UserWithRelations } from './user.model';
+import { Model, model, property, Entity, belongsTo, hasMany } from '@loopback/repository';
+import { Coworking, CoworkingWithRelations } from './coworking.model';
+import { Transaction } from './transaction.model';
 
 @model({
   settings: {
@@ -24,25 +23,27 @@ export class Room extends Entity {
 
   @property({
     type: 'string',
+    required: true,
   })
-  about?: string;
+  about: string;
 
   @property({
-    type: 'array',
-    itemType: 'string',
+    type: 'number',
+    required: true,
   })
-  photo?: string[];
+  price: number;
 
   @property({
-    type: Service,
+    type: 'number',
+    required: true,
   })
-  service: Service;
+  maxPerson: number;
 
-  @belongsTo(() => User)
-  userId: string;
+  @belongsTo(() => Coworking)
+  coworkingId: string;
 
-  @hasMany(() => StyleRoom, { keyTo: 'roomId' })
-  styleRooms?: StyleRoom[];
+  @hasMany(() => Transaction, { keyTo: 'roomId' })
+  transactions: Transaction[];
 
   constructor(data?: Partial<Room>) {
     super(data);
@@ -50,7 +51,7 @@ export class Room extends Entity {
 }
 
 export interface RoomRelations {
-  user?: UserWithRelations;
+  coworking?: CoworkingWithRelations;
 }
 
 export type RoomWithRelations = Room & RoomRelations;

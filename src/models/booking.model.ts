@@ -1,6 +1,11 @@
-import { Entity, model, property } from '@loopback/repository';
+import { Entity, model, property, belongsTo } from '@loopback/repository';
+import { Transaction, TransactionWithRelations } from './transaction.model';
 
-@model({ settings: { strict: false } })
+@model({
+  settings: {
+    strictObjectIDCoercion: true,
+  }
+})
 export class Booking extends Entity {
   @property({
     type: 'string',
@@ -44,25 +49,8 @@ export class Booking extends Entity {
   })
   status?: string;
 
-  @property({
-    type: 'string',
-  })
-  userId?: string;
-
-  @property({
-    type: 'string',
-  })
-  styleRoomId?: string;
-
-  @property({
-    type: 'string',
-  })
-  transactionId?: string;
-  // Define well-known properties here
-
-  // Indexer property to allow additional data
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [prop: string]: any;
+  @belongsTo(() => Transaction)
+  transactionId: string;
 
   constructor(data?: Partial<Booking>) {
     super(data);
@@ -70,7 +58,7 @@ export class Booking extends Entity {
 }
 
 export interface BookingRelations {
-  // describe navigational properties here
+  transaction?: TransactionWithRelations;
 }
 
 export type BookingWithRelations = Booking & BookingRelations;

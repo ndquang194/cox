@@ -4,6 +4,7 @@ import { promisify } from 'util';
 import { TokenService } from '@loopback/authentication';
 import { UserProfile, securityId } from '@loopback/security';
 import { TokenServiceBindings } from './key';
+import { AppResponse } from './appresponse';
 
 const jwt = require('jsonwebtoken');
 const signAsync = promisify(jwt.sign);
@@ -19,9 +20,7 @@ export class JWTService implements TokenService {
 
   async verifyToken(token: string): Promise<UserProfile> {
     if (!token) {
-      throw new HttpErrors.Unauthorized(
-        `Error verifying token : 'token' is null`,
-      );
+      throw new AppResponse(400, `Error verifying token : 'token' is null`);
     }
 
     let userProfile: UserProfile;
@@ -40,18 +39,14 @@ export class JWTService implements TokenService {
         },
       );
     } catch (error) {
-      throw new HttpErrors.Unauthorized(
-        `Error verifying token : ${error.message}`,
-      );
+      throw new AppResponse(400, `Error verifying token : ${error.message}`);
     }
     return userProfile;
   }
 
   async generateToken(userProfile: UserProfile): Promise<string> {
     if (!userProfile) {
-      throw new HttpErrors.Unauthorized(
-        'Error generating token : userProfile is null',
-      );
+      throw new AppResponse(400, 'Error generating token : userProfile is null');
     }
     const userInfoForToken = {
       id: userProfile[securityId],
@@ -65,7 +60,7 @@ export class JWTService implements TokenService {
         expiresIn: Number(this.jwtExpiresIn),
       });
     } catch (error) {
-      throw new HttpErrors.Unauthorized(`Error encoding token : ${error}`);
+      throw new AppResponse(400, `Error encoding token : ${error}`);
     }
 
     return token;

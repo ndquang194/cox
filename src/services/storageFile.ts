@@ -7,8 +7,9 @@ export async function saveFile(files: Array<any>, folder: string) {
   let filesName: string[] = [];
   files.forEach(async (item) => {
     const fileExt = path.extname(item.originalname);
-    const filename = `${path.join(folder, uuidv4() + fileExt)}`;
-    await fs.writeFileSync(`${path.join(Path.root, filename)}`, item.buffer);
+    const filename = `${uuidv4() + fileExt}`;
+    const filePath = `${path.join(folder, filename)}`;
+    await fs.writeFileSync(`${path.join(Path.root, filePath)}`, item.buffer);
     filesName.push(filename);
   });
   return filesName;

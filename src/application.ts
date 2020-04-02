@@ -4,7 +4,7 @@ import {
   RestExplorerBindings,
   RestExplorerComponent,
 } from '@loopback/rest-explorer';
-import { RepositoryMixin } from '@loopback/repository';
+import { RepositoryMixin, repository } from '@loopback/repository';
 import { RestApplication } from '@loopback/rest';
 import { ServiceMixin } from '@loopback/service-proxy';
 import path from 'path';
@@ -17,6 +17,8 @@ import { TokenServiceBindings, TokenServiceConstants, PasswordHasherBindings, Us
 import { JWTService } from './services/jwt';
 import { MyUserService } from './services/user-service';
 import { BcryptHasher } from './services/hash.password';
+import * as admin from "firebase-admin";
+const serviceAccount = require("../src/services/account_service.json");
 
 export interface PackageInfo {
   name: string;
@@ -30,7 +32,7 @@ const pkg: PackageInfo = require('../package.json');
 export class CoexApplication extends BootMixin(
   ServiceMixin(RepositoryMixin(RestApplication)),
 ) {
-  constructor(options: ApplicationConfig = {}) {
+  constructor(options: ApplicationConfig = {}, ) {
     super(options);
 
     // Set up the custom sequence
@@ -40,6 +42,9 @@ export class CoexApplication extends BootMixin(
 
     // Set up default home page
     this.static('/', path.join(__dirname, '../public'));
+
+    // Set up static file image
+    this.static('/images', path.join(__dirname, '../public/images'));
 
     // Customize @loopback/rest-explorer configuration here
     this.bind(RestExplorerBindings.CONFIG).to({
@@ -53,6 +58,13 @@ export class CoexApplication extends BootMixin(
     registerAuthenticationStrategy(this, JWTAuthenticationStrategy);
 
     this.sequence(MyAuthenticationSequence);
+
+
+    //firebase
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+      databaseURL: "https://coex-d7257.firebaseio.com"
+    });
 
     this.projectRoot = __dirname;
     // Customize @loopback/boot Booter Conventions here

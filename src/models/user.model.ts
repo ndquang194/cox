@@ -1,9 +1,13 @@
 import { Entity, model, property, hasMany } from '@loopback/repository';
-import { Room } from './room.model'
-import { Booking } from './booking.model';
-import { Transaction } from './transaction.model';
+import { Coworking } from './coworking.model';
+import { Transaction } from './transaction.model'
+import { Client } from './client.model'
 
-@model()
+@model({
+  settings: {
+    hiddenProperties: ['password', 'token', 'firebase_token']
+  }
+})
 export class User extends Entity {
   @property({
     type: 'string',
@@ -28,46 +32,22 @@ export class User extends Entity {
   password: string;
 
   @property({
-    type: 'string',
-  })
-  name: string;
-
-  @property({
-    type: 'string',
-  })
-  phone?: string;
-
-  @property({
     type: 'boolean',
     required: true,
   })
   typeUser: boolean;
 
   @property({
-    type: 'array',
-    itemType: 'string',
-    default: []
+    type: Client,
   })
-  bookingIDs: string[];
+  client: Client;
 
-  @property({
-    type: 'string',
-  })
-  address: string;
+  @hasMany(() => Coworking, { keyTo: 'userId' })
+  coworkings: Coworking[];
 
-  @property({
-    type: 'array',
-    itemType: 'number',
-  })
-  location?: number[];
+  @hasMany(() => Transaction, { keyTo: 'userId' })
+  transactions: Transaction[];
 
-  @property({
-    type: 'number',
-  })
-  distance?: number;
-
-  @hasMany(() => Room, { keyTo: 'userId' })
-  rooms: Room[];
 
   @property({
     type: 'array',
@@ -76,11 +56,12 @@ export class User extends Entity {
   })
   token: string[];
 
-  @hasMany(() => Booking)
-  bookings: Booking[];
-
-  @hasMany(() => Transaction)
-  transactions: Transaction[];
+  @property({
+    type: 'array',
+    itemType: 'string',
+    default: []
+  })
+  firebase_token: string[];
 
   constructor(data?: Partial<User>) {
     super(data);

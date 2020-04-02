@@ -5,6 +5,7 @@ import {
 } from '@loopback/authorization';
 import _ from 'lodash';
 import { UserProfile, securityId } from '@loopback/security';
+import { AppResponse } from './appresponse';
 
 // Instance level authorizer
 // Can be also registered as an authorizer, depends on users' need.
@@ -22,7 +23,7 @@ export async function basicAuthorization(
     ]);
     currentUser = { [securityId]: user.id, email: user.email, typeUser: user.typeUser ? "Admin" : "Customer" };
   } else {
-    return AuthorizationDecision.DENY;
+    throw new AppResponse(401, 'Access denied');
   }
 
   // No require Role
@@ -37,7 +38,6 @@ export async function basicAuthorization(
   }
 
   if (!roleIsAllowed)
-    return AuthorizationDecision.DENY;
-
+    throw new AppResponse(401, 'Access denied');
   return AuthorizationDecision.ALLOW;
 }

@@ -7,6 +7,7 @@ import { repository } from '@loopback/repository';
 import { BcryptHasher } from './hash.password';
 import { PasswordHasherBindings } from './key';
 import { inject } from '@loopback/context';
+import { AppResponse } from './appresponse';
 
 export class MyUserService implements UserService<User, Credentials> {
   constructor(
@@ -22,7 +23,7 @@ export class MyUserService implements UserService<User, Credentials> {
       where: { email: credentials.email },
     });
     if (!foundUser) {
-      throw new HttpErrors.Unauthorized(invalidCredentialsError);
+      throw new AppResponse(400, invalidCredentialsError);
     }
 
     const passwordMatched = await this.passwordHasher.comparePassword(
@@ -31,7 +32,7 @@ export class MyUserService implements UserService<User, Credentials> {
     );
 
     if (!passwordMatched) {
-      throw new HttpErrors.Unauthorized(invalidCredentialsError);
+      throw new AppResponse(400, invalidCredentialsError);
     }
 
     return foundUser;

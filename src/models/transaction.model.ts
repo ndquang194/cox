@@ -1,14 +1,20 @@
-import { Entity, model, property, hasMany } from '@loopback/repository';
+import { Entity, model, property, hasMany, belongsTo } from '@loopback/repository';
 import { Booking } from './booking.model';
+import { User, UserWithRelations } from '.';
+import { Room, RoomWithRelations } from './room.model';
 
-@model({ settings: { strict: false } })
+@model({
+  settings: {
+    strictObjectIDCoercion: true,
+  }
+})
 export class Transaction extends Entity {
   @property({
     type: 'string',
     id: true,
     generated: true,
   })
-  id?: string;
+  id: string;
 
   @property({
     type: 'number',
@@ -37,24 +43,34 @@ export class Transaction extends Entity {
   update_at: Date;
 
   @property({
-    type: 'array',
-    itemType: 'string',
-    default: []
+    type: 'boolean',
+    required: true,
+    default: false
   })
-  bookingIDs: string[];
+  check_in: boolean;
+
+  @property({
+    type: 'boolean',
+    required: true,
+    default: false
+  })
+  check_out: boolean;
+
+  @property({
+    type: 'string',
+    required: true,
+  })
+  booking_reference: string;
 
   @hasMany(() => Booking)
   bookings: Booking[];
 
-  @property({
-    type: 'string',
-  })
-  userId?: string;
-  // Define well-known properties here
+  @belongsTo(() => User)
+  userId: string;
 
-  // Indexer property to allow additional data
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [prop: string]: any;
+  @belongsTo(() => Room)
+  roomId: string;
+
 
   constructor(data?: Partial<Transaction>) {
     super(data);
@@ -62,7 +78,8 @@ export class Transaction extends Entity {
 }
 
 export interface TransactionRelations {
-  // describe navigational properties here
+  user?: UserWithRelations;
+  room?: RoomWithRelations;
 }
 
 export type TransactionWithRelations = Transaction & TransactionRelations;
