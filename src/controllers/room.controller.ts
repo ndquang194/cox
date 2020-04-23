@@ -56,7 +56,7 @@ export class RoomController {
         'application/json': {
           schema: getModelSchemaRef(Room, {
             title: 'NewRoom',
-            exclude: ['id'],
+            exclude: ['id', 'coworkingId'],
           }),
         },
       },
@@ -86,16 +86,23 @@ export class RoomController {
       },
     },
   })
-  async replaceById(
+  async updateById(
     @param.path.string('id') id: string,
-    @requestBody() room: Room,
+    @requestBody({
+      content: {
+        'application/json': {
+          schema: getModelSchemaRef(Room, { exclude: ['id', 'coworkingId'] }),
+        },
+      },
+    })
+    room: Room,
     @inject(SecurityBindings.USER)
     currentUserProfile: UserProfile,
   ): Promise<AppResponse> {
     let coworking = await this.roomRepository.coworking(id);
     if (coworking.userId != currentUserProfile[securityId])
       throw new AppResponse(401, "Access denied");
-    await this.roomRepository.replaceById(id, room);
+    await this.roomRepository.updateById(id, room);
     return new AppResponse(200, 'Update sucess');
   }
 
@@ -113,7 +120,6 @@ export class RoomController {
   })
   async deleteById(
     @param.path.string('id') id: string,
-    @requestBody() room: Room,
     @inject(SecurityBindings.USER)
     currentUserProfile: UserProfile,
   ): Promise<AppResponse> {
@@ -173,17 +179,28 @@ export class RoomController {
     if (date == undefined || date <= 0) throw new AppResponse(400, "date invaild");
     if ((await this.roomRepository.coworking(id)).userId != currentUserProfile[securityId])
       throw new AppResponse(401, "Access denied");
-    let atransaction: any[] = [];
-    let transactions = await this.roomRepository.transactions(id).find({ include: [{ relation: 'bookings' }], });
+    let listTransaction: any[] = [];
+    let transactions = await this.roomRepository.transactions(id).find({ include: [{ relation: 'bookings' }, { relation: 'user' }], });
     transactions.forEach(e => {
       let check = false;
+      let item: any = { ...e };
+      item.duration = 0;
       e.bookings.forEach(e1 => {
-        if (e1.date_time.getTime() == date)
+        item.duration += e1.end_time - e1.start_time;
+        if (e1.date_time.getTime() == date) {
           check = true;
+          item.start_time_date = e1.start_time;
+          item.duration_date = e1.end_time - e1.start_time;
+        }
       });
-      if (check)
-        atransaction.push(e);
+      if (check) {
+        item.date_time = e.bookings[0].date_time.getTime();
+        item.start_time = e.bookings[0].start_time;
+        item.numPerson = e.bookings[0].numPerson;
+        delete item.bookings;
+        listTransaction.push(item);
+      }
     })
-    return new AppResponse(200, 'Success', atransaction);
+    return new AppResponse(200, 'Success', listTransaction);
   }
 }

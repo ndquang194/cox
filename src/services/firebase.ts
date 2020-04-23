@@ -11,7 +11,7 @@ export class FireBase {
 
     admin.messaging().sendMulticast(message)
       .then((response) => {
-        console.log(response);
+        // console.log(response);
       });
   }
 
@@ -21,7 +21,7 @@ export class FireBase {
     });
     admin.messaging().sendAll(messages)
       .then((response) => {
-        console.log(response);
+        // console.log(response);
       });
   }
 }

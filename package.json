@@ -56,8 +56,10 @@
     "@loopback/rest": "^2.0.0",
     "@loopback/rest-explorer": "^1.4.10",
     "@loopback/service-proxy": "^1.3.17",
+    "@types/axios": "^0.14.0",
     "@types/bcryptjs": "^2.4.2",
     "agenda": "^3.0.0",
+    "axios": "^0.19.2",
     "bcryptjs": "^2.4.3",
     "firebase-admin": "^8.10.0",
     "jsonwebtoken": "^8.5.1",
@@ -65,6 +67,7 @@
     "loopback-connector-mongodb": "^4.2.0",
     "loopback-datasource-juggler": "^4.19.2",
     "multer": "^1.4.2",
+    "node-fetch": "^2.6.0",
     "node-schedule": "^1.3.2",
     "nodemailer": "^6.4.4"
   },

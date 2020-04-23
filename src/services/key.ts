@@ -44,3 +44,5 @@ export namespace Path {
   export const root = path.join(__dirname, '../../public/');
   export const images = 'images';
 }
+
+export const CoinServer = 'http://dev.coinserver.unox.site';

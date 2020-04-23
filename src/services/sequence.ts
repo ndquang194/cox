@@ -53,6 +53,7 @@ export class MyAuthenticationSequence implements SequenceHandler {
       this.send(response, result);
     } catch (err) {
       let message, statusCode;
+      console.log(err);
       const { response } = context;
       if (err.code != undefined && typeof (err.code) == 'string') {
         statusCode = (ErrorCode as any)[err.code] == undefined ? 500 : (ErrorCode as any)[err.code];
@@ -61,7 +62,6 @@ export class MyAuthenticationSequence implements SequenceHandler {
       else if (err.code != undefined && typeof (err.code) == 'number' && err.code <= 500) {
         response.statusCode = err.code;
         this.send(response, err);
-        console.log(err);
         return;
       } else if (err.message != undefined) {
         statusCode = 400;

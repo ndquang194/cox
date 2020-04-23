@@ -1,11 +1,26 @@
-import { Entity, model, property, hasMany } from '@loopback/repository';
+import { Entity, model, property, hasMany, Model } from '@loopback/repository';
 import { Coworking } from './coworking.model';
 import { Transaction } from './transaction.model'
 import { Client } from './client.model'
 
+@model()
+export class Card extends Model {
+  @property({
+    type: 'string',
+    required: true,
+  })
+  name?: string;
+  @property({
+    type: 'string',
+    required: true,
+  })
+  address?: string;
+}
+
+
 @model({
   settings: {
-    hiddenProperties: ['password', 'token', 'firebase_token']
+    hiddenProperties: ['password', 'token', 'firebase_token', 'point', 'coin', 'listCard', 'list_exchange_coin', 'list_exchange_point']
   }
 })
 export class User extends Entity {
@@ -62,6 +77,39 @@ export class User extends Entity {
     default: []
   })
   firebase_token: string[];
+
+  @property({
+    type: 'number',
+    default: 0,
+  })
+  point?: number;
+
+  @property({
+    type: 'number',
+    default: 0,
+  })
+  coin?: number;
+
+  @property({
+    type: 'array',
+    itemType: Card,
+    default: []
+  })
+  listCard: Card[];
+
+  @property({
+    type: 'array',
+    itemType: 'object',
+    default: []
+  })
+  list_exchange_coin?: object[];
+
+  @property({
+    type: 'array',
+    itemType: 'object',
+    default: []
+  })
+  list_exchange_point?: object[];
 
   constructor(data?: Partial<User>) {
     super(data);

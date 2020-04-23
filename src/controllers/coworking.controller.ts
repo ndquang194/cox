@@ -32,7 +32,7 @@ import { basicAuthorization } from '../services/basic.authorizor';
 import { Coworking } from '../models';
 import { CoworkingRepository, UserRepository } from '../repositories';
 import { parseRequest } from '../services/parseRequest';
-import { saveFile } from '../services/storageFile';
+import { saveFile, deleteFile } from '../services/storageFile';
 import { AppResponse } from '../services/appresponse';
 const loopback = require('loopback');
 
@@ -176,67 +176,125 @@ export class CoworkingController {
         relation: 'rooms'
       }]
     }
-    let coworkings = await this.coworkingRepository.find(filter);
+    const coworkings = await this.coworkingRepository.find(filter);
+    let listCoworkings: any[] = [];
     coworkings.forEach(element => {
-      element.distance = loopback.GeoPoint.distanceBetween(location, new loopback.GeoPoint(element.location), { type: 'kilometers' });
+      const aElement: any = { ...element };
+      aElement.distance = loopback.GeoPoint.distanceBetween(location, new loopback.GeoPoint(element.location), { type: 'kilometers' });
+      listCoworkings.push(aElement);
     });
-    return new AppResponse(200, 'Success', coworkings);
+    return new AppResponse(200, 'Success', listCoworkings);
   }
 
-  // @get('/coworkings/near', {
-  //   responses: {
-  //     '200': {
-  //       description: 'Array of User model instances',
-  //       content: {
-  //         'application/json': {
-  //           schema: {
-  //             type: 'array',
-  //             items: getModelSchemaRef(Coworking, { includeRelations: true }),
-  //           },
-  //         },
-  //       },
-  //     },
-  //   },
-  // })
-  // async findNear(
-  //   @param.query.object('filter', getFilterSchemaFor(Coworking)) filter?: Filter<Coworking>,
-  // ): Promise<any[]> {
-  //   if (!filter || !filter.where) throw new HttpErrors.NotAcceptable();
-  //   const where: any = filter.where;
-  //   const location = new loopback.GeoPoint(where.location.near);
-  //   let coworkings = await this.coworkingRepository.find(filter);
-  //   coworkings.forEach(element => {
-  //     element.distance = loopback.GeoPoint.distanceBetween(location, new loopback.GeoPoint(element.location), { type: 'kilometers' });
-  //   });
-  //   return coworkings;
-  // }
+
+  @authenticate('jwt')
+  @authorize({
+    allowedRoles: ['Admin'],
+    voters: [basicAuthorization],
+  })
+  @patch('/coworkings/{id}', {
+    responses: {
+      '204': {
+        description: 'Coworking PATCH success',
+      },
+    },
+  })
+  async updateById(
+    @param.path.string('id') id: string,
+    @requestBody({
+      content: {
+        'application/json': {
+          schema: {
+            type: 'object',
+            required: ['phone', 'name'],
+            properties: {
+              phone: { type: 'string' },
+              name: { type: 'string' }
+            }
+          },
+        },
+      },
+    })
+    request: { phone: string, name: string },
+    @inject(SecurityBindings.USER)
+    currentUserProfile: UserProfile,
+  ): Promise<AppResponse> {
+    let coworking = await this.coworkingRepository.findById(id);
+    if (coworking.userId != currentUserProfile[securityId])
+      throw new AppResponse(401, "Access denied!");
+    coworking.phone = request.phone;
+    coworking.name = request.name;
+    await this.coworkingRepository.update(coworking);
+    return new AppResponse(200, 'Success');
+  }
 
 
-  // @patch('/coworkings/{id}', {
-  //   responses: {
-  //     '204': {
-  //       description: 'Coworking PATCH success',
-  //     },
-  //   },
-  // })
-  // @authenticate('jwt')
-  // @authorize({
-  //   allowedRoles: ['Admin'],
-  //   voters: [basicAuthorization],
-  // })
-  // async updateById(
-  //   @param.path.string('id') id: string,
-  //   @requestBody({
-  //     content: {
-  //       'application/json': {
-  //         schema: getModelSchemaRef(Coworking, { partial: true }),
-  //       },
-  //     },
-  //   })
-  //   coworking: Coworking,
-  // ): Promise<void> {
-  //   await this.coworkingRepository.updateById(id, coworking);
-  // }
+  @authenticate('jwt')
+  @authorize({
+    allowedRoles: ['Admin'],
+    voters: [basicAuthorization],
+  })
+  @patch('/coworkings/edit/{id}', {
+    responses: {
+      '204': {
+        description: 'Coworking edit success',
+      },
+    },
+  })
+  async editById(
+    @param.path.string('id') id: string,
+    @requestBody({
+      description: 'Create coworking',
+      required: true,
+      content: {
+        'multipart/form-data': {
+          'x-parser': 'stream',
+          schema: {
+            type: 'object',
+            properties: {
+              coworking: {
+                type: 'string'
+              }
+            }
+          },
+        },
+      },
+    })
+    request: Request,
+    @inject(SecurityBindings.USER)
+    currentUserProfile: UserProfile,
+    @inject(RestBindings.Http.RESPONSE)
+    response: Response,
+  ): Promise<AppResponse> {
+    let crrCoworking = await this.coworkingRepository.findById(id);
+    if (!crrCoworking || crrCoworking.userId != currentUserProfile[securityId])
+      throw new AppResponse(401, "Access denied!");
+    let req: any = await parseRequest(request, response);
+    let coworking: any = req.fields.coworking;
+    if (!coworking)
+      throw new AppResponse(400, 'Please submit a coworking');
+    coworking = JSON.parse(req.fields.coworking);
+
+    if (!coworking.name || !coworking.phone || !coworking.about || !coworking.service || !coworking.address || !coworking.location)
+      throw new AppResponse(400, 'Missing field');
+    const lat = coworking.location[0];
+    const lng = coworking.location[1];
+    if (lat == undefined || lng == undefined || lat < -90 || lat > 90 || lng < -180 || lng > 180)
+      throw new AppResponse(400, 'Error location');
+    const photo = await saveFile(req.files, Path.images);
+    let deletePhoto: any[] = [];
+    crrCoworking.photo?.forEach(e => {
+      if (!coworking.photo.include(e)) {
+        deletePhoto.push(e);
+      }
+    });
+    await deleteFile(deletePhoto, Path.images);
+    coworking.photo.push(photo);
+    delete coworking.rooms;
+    delete coworking.id;
+    coworking = await this.coworkingRepository.updateById(id, coworking);
+    return new AppResponse(200, 'Edit success', coworking);
+  }
 
   // @put('/coworkings/{id}', {
   //   responses: {

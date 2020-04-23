@@ -58,18 +58,8 @@ export class Coworking extends Entity {
   })
   location?: number[];
 
-  @property({
-    type: 'number',
-  })
-  distance?: number;
-
   @hasMany(() => Room, { keyTo: 'coworkingId' })
   rooms?: Room[];
-
-  @property({
-    type: Client,
-  })
-  client: Client;
 
   constructor(data?: Partial<Room>) {
     super(data);

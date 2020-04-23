@@ -46,12 +46,6 @@ export class CreateBooking extends Entity {
     itemType: mDate
   })
   listDate: mDate[];
-
-  @property({
-    type: 'number',
-    require: true,
-  })
-  price: number;
 }
 
 
@@ -61,20 +55,19 @@ export class ValidateBooking {
     public roomrepository: RoomRepository, ) {
   }
 
-  async checkCondition(createBooking: CreateBooking, transactionId: string) {
+  async   checkCondition(createBooking: CreateBooking, transactionId: string) {
     let result = {
       status: false,
       message: '',
       data: []
     };
-    if (createBooking.numberPerson <= 0 || createBooking.listDate.length == 0 ||
-      !createBooking.room_id || createBooking.price <= 0) {
+    if (createBooking.numberPerson <= 0 || !createBooking.listDate || createBooking.listDate.length == 0 ||
+      !createBooking.room_id) {
       throw new AppResponse(400, 'missing field');
     }
     let room = await this.roomrepository.findById(createBooking.room_id);
     let bookings: any = [];
 
-    let price = 0;
     for (var i = 0; i < createBooking.listDate.length; i++) {
       let day = createBooking.listDate[i].date;
       let startTime = createBooking.listDate[i].startTime;
@@ -82,7 +75,6 @@ export class ValidateBooking {
       let date = new Date();
       date.setHours(0, 0, 0, 0);
       date.setFullYear(parseInt(day.substring(6, 10)), parseInt(day.substring(3, 5)) - 1, parseInt(day.substring(0, 2)));
-      price += createBooking.numberPerson * room.price * createBooking.listDate[i].duration;
       if (startTime < 0 || endTime <= startTime || endTime > 24 || !day || date.getTime() <= 0) {
         throw new AppResponse(400, 'missing field');
       }
@@ -119,13 +111,18 @@ export class ValidateBooking {
       booking.status = MyDefault.BOOKING_STATUS.PENDING;
       bookings.push(booking);
     }
-    if (createBooking.price != price) {
-      throw new AppResponse(400, 'err price');
-    }
     result.status = true;
     result.message = 'success';
     result.data = bookings;
     return result;
   }
+}
 
+export async function getPrice(roomrepository: RoomRepository, createBooking: CreateBooking) {
+  let room = await roomrepository.findById(createBooking.room_id);
+  let price: number = 0;
+  for (var i = 0; i < createBooking.listDate.length; i++) {
+    price += createBooking.numberPerson * room.price * createBooking.listDate[i].duration;
+  }
+  return price;
 }

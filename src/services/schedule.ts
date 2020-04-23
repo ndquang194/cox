@@ -88,7 +88,7 @@ export class Schedule {
     Schedule.agenda.define('noti_reminder_check_in', async (job: any) => {
       const data = job.attrs.data;
       const atransaction = await self.transactionRepository.findById(data.id, { include: [{ relation: 'bookings' }, { relation: 'room', scope: { include: [{ relation: 'coworking', scope: { include: [{ relation: 'user' }] } }] } }, { relation: 'user' }] });
-      if (!atransaction || atransaction.check_in || atransaction.status == MyDefault.TRANSACTION_STATUS.CANCELLED || data.update_at != atransaction.update_at) return;
+      if (!atransaction || atransaction.check_in || atransaction.status == MyDefault.TRANSACTION_STATUS.CANCELLED || data.update_at.getTime() != atransaction.update_at.getTime()) return;
       FireBase.sendMulti(atransaction.room?.coworking?.user?.firebase_token as any, {
         title: `[Reminder] Sắp đến giờ ` + (atransaction.check_in ? '' : 'check-in ') + `#${atransaction.booking_reference}`,
         body: `Vui lòng đón khách ` + (atransaction.check_in ? '' : 'check-in ') + `lúc ${cDate.formatTime(atransaction.bookings[0].start_time)}h ${cDate.formatDate(atransaction.bookings[0].date_time as Date)}`
@@ -103,7 +103,7 @@ export class Schedule {
     Schedule.agenda.define('noti_reminder_check_out', async (job: any) => {
       const data = job.attrs.data;
       const atransaction: any = await self.transactionRepository.findById(data.id, { include: [{ relation: 'bookings' }, { relation: 'room', scope: { include: [{ relation: 'coworking', scope: { include: [{ relation: 'user' }] } }] } }, { relation: 'user' }] });
-      if (!atransaction || atransaction.check_out || atransaction.status == MyDefault.TRANSACTION_STATUS.CANCELLED || data.update_at != atransaction.update_at) return;
+      if (!atransaction || atransaction.check_out || atransaction.status == MyDefault.TRANSACTION_STATUS.CANCELLED || data.update_at.getTime() != atransaction.update_at.getTime()) return;
       FireBase.sendMulti(atransaction.room.coworking?.user?.firebase_token as any, {
         title: `[Reminder] Sắp đến giờ check-out #${atransaction.booking_reference}`,
         body: `Khách hàng sẽ check-out sau ${data.time} phút`
@@ -118,7 +118,7 @@ export class Schedule {
     Schedule.agenda.define('noti_reminder_check_out_over_5', async (job: any) => {
       const data = job.attrs.data;
       const atransaction: any = await self.transactionRepository.findById(data.id, { include: [{ relation: 'bookings' }, { relation: 'room', scope: { include: [{ relation: 'coworking', scope: { include: [{ relation: 'user' }] } }] } }, { relation: 'user' }] });
-      if (!atransaction || atransaction.check_out || atransaction.status == MyDefault.TRANSACTION_STATUS.CANCELLED || data.update_at != atransaction.update_at) return;
+      if (!atransaction || atransaction.check_out || atransaction.status == MyDefault.TRANSACTION_STATUS.CANCELLED || data.update_at.getTime() != atransaction.update_at.getTime()) return;
       FireBase.sendMulti(atransaction.room.coworking?.user?.firebase_token as any, {
         title: `[Reminder] Booking quá thời gian check-out #${atransaction.booking_reference}`,
         body: `Khách hàng đã quá thời gian check-out 5 phút`
@@ -129,9 +129,8 @@ export class Schedule {
     Schedule.agenda.define('noti_cancel_booking_over_time', async (job: any) => {
       const data = job.attrs.data;
       const atransaction: any = await self.transactionRepository.findById(data.id, { include: [{ relation: 'bookings' }, { relation: 'room', scope: { include: [{ relation: 'coworking', scope: { include: [{ relation: 'user' }] } }] } }, { relation: 'user' }] });
-      if (!atransaction || atransaction.check_out || data.update_at != atransaction.update_at) return;
+      if (!atransaction || atransaction.check_out || data.update_at.getTime() != atransaction.update_at.getTime()) return;
       atransaction.status = MyDefault.TRANSACTION_STATUS.CANCELLED;
-      self.transactionRepository.update(atransaction);
       self.transactionRepository.bookings(atransaction.id).patch({ status: MyDefault.BOOKING_STATUS.CANCELLED })
       FireBase.sendMulti(atransaction.room.coworking?.user?.firebase_token as any, {
         title: `[Cancel booking] Đã hủy booking #${atransaction.booking_reference}`,
@@ -141,6 +140,10 @@ export class Schedule {
         title: `Đã hủy booking #${atransaction.booking_reference}`,
         body: `Booking #${atransaction.booking_reference} đã được hủy do quá thời gian check-in`
       })
+      delete atransaction.room;
+      delete atransaction.user;
+      delete atransaction.bookings;
+      self.transactionRepository.update(atransaction);
     });
 
 

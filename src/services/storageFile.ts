@@ -14,3 +14,13 @@ export async function saveFile(files: Array<any>, folder: string) {
   });
   return filesName;
 }
+
+export async function deleteFile(files: Array<any>, folder: string) {
+  files.forEach(async (item) => {
+    const filePath = `${path.join(folder, item)}`;
+    const file = `${path.join(Path.root, filePath)}`;
+    if (await fs.existsSync(file)) {
+      await fs.unlinkSync(file);
+    }
+  });
+}

@@ -76,7 +76,6 @@ export class UserController {
     // Validate Password Length
     if (!user.password || user.password.length < 6) {
       throw new AppResponse(400, 'Password must be minimum 6 characters!');
-
     }
 
     if (!user.typeUser && (!user.client || !user.client.name || !user.client.phone))
@@ -110,8 +109,8 @@ export class UserController {
     @inject(SecurityBindings.USER)
     currentUserProfile: UserProfile,
   ): Promise<AppResponse> {
-    const userId = currentUserProfile[securityId];
-    return new AppResponse(200, 'Success', await this.userRepository.findById(userId));
+    let user = await this.userRepository.findById(currentUserProfile[securityId]);
+    return new AppResponse(200, 'Success', user);
   }
 
 
@@ -258,20 +257,14 @@ export class UserController {
   ): Promise<AppResponse> {
     let user = await this.userRepository.findById(currentUserProfile[securityId]);
     if (!user) throw new AppResponse(400, 'Not found user');
-    if (!request || !request.oldPassword || !request.newPassword || !request.firebase_token)
-      throw new AppResponse(400, 'Required old password, new password and firebase token');
-    let verifyFirebaseToken = true;
-    admin.auth().verifyIdToken(request.firebase_token)
-      .then(function (decodedToken) {
-      }).catch(function (error) {
-        verifyFirebaseToken = false;
-      });
-    if (!verifyFirebaseToken) throw new AppResponse(400, 'firebase_token not vaild');
+    if (!request || !request.oldPassword || !request.newPassword || !request.firebase_token || request.newPassword.length < 6)
+      throw new AppResponse(400, 'Required old password, new password (min 6 characters) and firebase token');
     if (! await this.bcryptHaser.comparePassword(request.oldPassword, user.password))
       throw new AppResponse(400, 'your old password not vaild');
     user.password = await this.bcryptHaser.hashPassword(request.newPassword);
     user.token = [];
-    const token = this.request.headers.authorization + '';
+    const authorization = this.request.headers.authorization + '';
+    const token = authorization.substr(7, authorization.length - 7);
     user.token.push(token);
     user.firebase_token = [];
     user.firebase_token.push(request.firebase_token);

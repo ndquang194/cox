@@ -1,6 +1,10 @@
-import { Model, model, property } from '@loopback/repository';
+import { Model, model, property, Entity } from '@loopback/repository';
 
-@model()
+@model({
+  settings: {
+    hiddenProperties: ['coin', 'point', 'listCard']
+  }
+})
 export class Client extends Model {
   @property({
     type: 'string',
@@ -13,7 +17,6 @@ export class Client extends Model {
     required: true,
   })
   phone?: string;
-
 
   constructor(data?: Partial<Client>) {
     super(data);
