@@ -37,6 +37,7 @@ import { MyDefault } from '../services/mydefault';
 import { FireBase } from '../services/firebase';
 import { Notification } from '../services/schedule';
 import { cDate } from '../services/date';
+import { MoneyToCoin } from '../services/key'
 
 export class BookingController {
   constructor(
@@ -169,14 +170,15 @@ export class BookingController {
     transaction = await this.transactionRepository.findById(transaction.id, { include: [{ relation: 'bookings' }, { relation: 'room', scope: { include: [{ relation: 'coworking', scope: { include: [{ relation: 'user' }] } }] } }, { relation: 'user' }] });
     const start_time = (result.data[0] as any).start_time;
     const start_date = (result.data[0] as any).date_time;
-    FireBase.sendMulti(transaction.room?.coworking?.user?.firebase_token as any, {
-      title: `[Edit Booking] ${transaction.user?.client.name} #${transaction.booking_reference}`,
-      body: `Đã đổi đặt phòng thành lúc ${cDate.formatTime(start_time)}h ${cDate.formatDate(start_date)}`
-    })
-    FireBase.sendMulti(transaction.user?.firebase_token as any, {
-      title: `Sửa booking thành công #${transaction.booking_reference}`,
-      body: `Bạn đã đặt phòng lúc ${cDate.formatTime(start_time)}h ${cDate.formatDate(start_date)}`
-    })
+    Notification.NotiUpdateSuccess(start_time, start_date, transaction);
+    // FireBase.sendMulti(transaction.room?.coworking?.user?.firebase_token as any, {
+    //   title: `[Edit Booking] ${transaction.user?.client.name} #${transaction.booking_reference}`,
+    //   body: `Đã đổi đặt phòng thành lúc ${cDate.formatTime(start_time)}h ${cDate.formatDate(start_date)}`
+    // })
+    // FireBase.sendMulti(transaction.user?.firebase_token as any, {
+    //   title: `Sửa booking thành công #${transaction.booking_reference}`,
+    //   body: `Bạn đã đặt phòng lúc ${cDate.formatTime(start_time)}h ${cDate.formatDate(start_date)}`
+    // })
     Notification.noti_reminder_check_in(start_time, start_date, 30, transaction.id, transaction.update_at);
     const end_time = (result.data[result.data.length - 1] as any).end_time;
     const end_date = (result.data[result.data.length - 1] as any).date_time;
@@ -227,13 +229,13 @@ export class BookingController {
     await this.transactionRepository.update(transaction);
 
     FireBase.sendMulti(room.coworking?.user?.firebase_token as any, {
-      title: `[Check-in] ${user?.client.name} đã check-in #${transaction.booking_reference}`,
-      body: `Khách hàng đã check-in thành công.`
+      title: `[Check-in] ${user?.client.name} checked-in #${transaction.booking_reference}`,
+      body: `Customer have checked-in successfully.`
     })
 
     FireBase.sendMulti(user?.firebase_token as any, {
-      title: `Check-in thành công #${transaction.booking_reference}`,
-      body: `Bạn đã check-in thành công`
+      title: `Check-in successfully #${transaction.booking_reference}`,
+      body: `You have checked-in successfully`
     })
     return new AppResponse(200, 'Check-in success', { key: 'CHECK_IN_SUCCESS' });
   }
@@ -257,7 +259,8 @@ export class BookingController {
       throw new AppResponse(401, 'Access denied', { key: 'ACCESS_DENIED' });
     if (transaction.status == MyDefault.TRANSACTION_STATUS.CANCELLED)
       throw new AppResponse(400, 'This booking was canceled', { key: 'THIS_BOOKING_CANCELED' });
-
+    if (transaction.check_in)
+      throw new AppResponse(400, 'This booking cannot cancel', { key: 'THIS_BOOKING_CAN_NOT_CANCELED' });
 
     const room = transaction.room;
     const user = transaction.user;
@@ -313,7 +316,7 @@ export class BookingController {
     if (transaction.status != MyDefault.TRANSACTION_STATUS.ON_GOING) throw new AppResponse(400, 'Check out not allow', { key: 'CHECK_OUT_NOT_ALLOW' });
 
     const room = transaction.room;
-    const user = transaction.user;
+    let user = transaction.user;
     const bookings = transaction.bookings;
 
     let end_date = bookings[bookings.length - 1].date_time;
@@ -327,14 +330,24 @@ export class BookingController {
     transaction.status = MyDefault.TRANSACTION_STATUS.SUCCESS;
     await this.transactionRepository.update(transaction);
 
+    user = await this.userRepository.findById(transaction.userId);
+    user.point += parseInt((transaction.price / MoneyToCoin) + '');
+    user.list_exchange_point?.push({ createAt: new Date(), point: parseInt((transaction.price / MoneyToCoin) + '') });
+    await this.userRepository.update(user);
+
+    FireBase.sendMulti(user.firebase_token, {
+      title: `Reward point #${transaction.booking_reference}`,
+      body: `You are rewarded ${parseInt((transaction.price / MoneyToCoin) + '')} for booking #${transaction.booking_reference}`
+    })
+
     FireBase.sendMulti(room.coworking?.user?.firebase_token as any, {
-      title: `[Check-out] ${user?.client.name} đã check-out #${transaction.booking_reference}`,
-      body: `Khách hàng đã check-out thành công.`
+      title: `[Check-out] ${user?.client.name} check-out #${transaction.booking_reference}`,
+      body: `Customer have checked-out successfully`
     })
 
     FireBase.sendMulti(user?.firebase_token as any, {
-      title: `Check-out thành công #${transaction.booking_reference}`,
-      body: `Bạn đã check-out thành công`
+      title: `Check-out successfully #${transaction.booking_reference}`,
+      body: `You have checked-out successfully`
     })
     transaction.room = room;
     transaction.user = user;

@@ -55,7 +55,7 @@ export class ValidateBooking {
     public roomrepository: RoomRepository, ) {
   }
 
-  async   checkCondition(createBooking: CreateBooking, transactionId: string) {
+  async checkCondition(createBooking: CreateBooking, transactionId: string) {
     let result = {
       status: false,
       message: '',
@@ -111,6 +111,12 @@ export class ValidateBooking {
       booking.status = MyDefault.BOOKING_STATUS.PENDING;
       bookings.push(booking);
     }
+
+    const mDate = new Date((bookings[0] as any).date_time.getTime());
+    mDate.setHours((bookings[0] as any).start_time, 0, 0, 0);
+    if (mDate.getTime() < new Date().getTime() || bookings.length == 0)
+      throw new AppResponse(400, 'Time not vaild');
+
     result.status = true;
     result.message = 'success';
     result.data = bookings;

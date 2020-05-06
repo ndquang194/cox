@@ -1,32 +1,31 @@
-import { Room, User, Transaction } from "../models";
 import { TransactionRepository, RoomRepository, UserRepository, BookingRepository } from "../repositories";
 import { FireBase } from '../services/firebase';
 import { cDate } from '../services/date'
 import { MyDefault } from "./mydefault";
-import { repository } from "@loopback/repository";
+import { MoneyToCoin } from "./key";
 
 export class Notification {
   //Noti Book thành công
   public static async NotiSuccess(start_time: number, date_time: Date, transaction: any) {
     FireBase.sendMulti(transaction.room.coworking?.user?.firebase_token as any, {
       title: `[New Booking] ${transaction.user.client.name} #${transaction.booking_reference}`,
-      body: `Đặt phòng lúc ${cDate.formatTime(start_time)}h ${cDate.formatDate(date_time)}`
+      body: `Have new booking at ${cDate.formatTime(start_time)}h ${cDate.formatDate(date_time)}`
     })
     FireBase.sendMulti(transaction.user.firebase_token, {
-      title: `Đặt phòng thành công`,
-      body: `Bạn đã đặt phòng lúc ${cDate.formatTime(start_time)}h ${cDate.formatDate(date_time)}`
+      title: `Booking successfully`,
+      body: `You have requested booking successfully at ${cDate.formatTime(start_time)}h ${cDate.formatDate(date_time)}`
     })
   }
 
-  //Noti Book thành công
+  //Noti Edit thành công
   public static async NotiUpdateSuccess(start_time: number, date_time: Date, transaction: any) {
     FireBase.sendMulti(transaction.room.coworking?.user?.firebase_token as any, {
       title: `[Edit Booking] ${transaction.user.client.name} #${transaction.booking_reference}`,
-      body: `Đặt phòng lúc ${cDate.formatTime(start_time)}h ${cDate.formatDate(date_time)}`
+      body: `Booking at  ${cDate.formatTime(start_time)}h ${cDate.formatDate(date_time)}`
     })
     FireBase.sendMulti(transaction.user.firebase_token, {
-      title: `Chỉnh sửa đặt phòng thành công`,
-      body: `Bạn đã đặt phòng lúc ${cDate.formatTime(start_time)}h ${cDate.formatDate(date_time)}`
+      title: `Edit booking successfully`,
+      body: `You have booking at ${cDate.formatTime(start_time)}h ${cDate.formatDate(date_time)}`
     })
   }
 
@@ -78,7 +77,8 @@ export class Schedule {
 
   constructor(
     public transactionRepository: TransactionRepository,
-    public bookingRepository: BookingRepository
+    public bookingRepository: BookingRepository,
+    public userRepository: UserRepository
   ) {
   }
 
@@ -90,12 +90,12 @@ export class Schedule {
       const atransaction = await self.transactionRepository.findById(data.id, { include: [{ relation: 'bookings' }, { relation: 'room', scope: { include: [{ relation: 'coworking', scope: { include: [{ relation: 'user' }] } }] } }, { relation: 'user' }] });
       if (!atransaction || atransaction.check_in || atransaction.status == MyDefault.TRANSACTION_STATUS.CANCELLED || data.update_at.getTime() != atransaction.update_at.getTime()) return;
       FireBase.sendMulti(atransaction.room?.coworking?.user?.firebase_token as any, {
-        title: `[Reminder] Sắp đến giờ ` + (atransaction.check_in ? '' : 'check-in ') + `#${atransaction.booking_reference}`,
-        body: `Vui lòng đón khách ` + (atransaction.check_in ? '' : 'check-in ') + `lúc ${cDate.formatTime(atransaction.bookings[0].start_time)}h ${cDate.formatDate(atransaction.bookings[0].date_time as Date)}`
+        title: `[Reminder] Incomming booking ` + (atransaction.check_in ? '' : 'check-in ') + `#${atransaction.booking_reference}`,
+        body: `Please prepare to receive customer ` + (atransaction.check_in ? '' : 'check-in ') + `at ${cDate.formatTime(atransaction.bookings[0].start_time)}h ${cDate.formatDate(atransaction.bookings[0].date_time as Date)}`
       })
       FireBase.sendMulti(atransaction.user?.firebase_token as any, {
-        title: `Sắp đến giờ ` + (atransaction.check_in ? '' : 'check-in ') + `booking #${atransaction.booking_reference}`,
-        body: `Bạn có đặt phòng tại ${atransaction.room?.coworking?.name} lúc ${cDate.formatTime(atransaction.bookings[0].start_time)}h ${cDate.formatDate(atransaction.bookings[0].date_time as Date)}`
+        title: `Incomming booking ` + (atransaction.check_in ? '' : 'check-in ') + `booking #${atransaction.booking_reference}`,
+        body: `You have an booking in ${atransaction.room?.coworking?.name} at ${cDate.formatTime(atransaction.bookings[0].start_time)}h ${cDate.formatDate(atransaction.bookings[0].date_time as Date)}`
       })
     });
 
@@ -105,12 +105,12 @@ export class Schedule {
       const atransaction: any = await self.transactionRepository.findById(data.id, { include: [{ relation: 'bookings' }, { relation: 'room', scope: { include: [{ relation: 'coworking', scope: { include: [{ relation: 'user' }] } }] } }, { relation: 'user' }] });
       if (!atransaction || atransaction.check_out || atransaction.status == MyDefault.TRANSACTION_STATUS.CANCELLED || data.update_at.getTime() != atransaction.update_at.getTime()) return;
       FireBase.sendMulti(atransaction.room.coworking?.user?.firebase_token as any, {
-        title: `[Reminder] Sắp đến giờ check-out #${atransaction.booking_reference}`,
-        body: `Khách hàng sẽ check-out sau ${data.time} phút`
+        title: `[Reminder] Incomming check-out #${atransaction.booking_reference}`,
+        body: `${data.time} minutes to check-out booking`
       })
       FireBase.sendMulti(atransaction.user.firebase_token, {
-        title: `Sắp đến thời gian check-out`,
-        body: `Còn ${data.time} phút nữa sẽ đến thời gian check-out.`
+        title: `Incomming check-out`,
+        body: `${data.time} minutes to check-out booking #${atransaction.booking_reference}`
       });
     });
 
@@ -120,8 +120,8 @@ export class Schedule {
       const atransaction: any = await self.transactionRepository.findById(data.id, { include: [{ relation: 'bookings' }, { relation: 'room', scope: { include: [{ relation: 'coworking', scope: { include: [{ relation: 'user' }] } }] } }, { relation: 'user' }] });
       if (!atransaction || atransaction.check_out || atransaction.status == MyDefault.TRANSACTION_STATUS.CANCELLED || data.update_at.getTime() != atransaction.update_at.getTime()) return;
       FireBase.sendMulti(atransaction.room.coworking?.user?.firebase_token as any, {
-        title: `[Reminder] Booking quá thời gian check-out #${atransaction.booking_reference}`,
-        body: `Khách hàng đã quá thời gian check-out 5 phút`
+        title: `[Reminder] Overtime booking #${atransaction.booking_reference}`,
+        body: `Booking #${atransaction.booking_reference} check-out overtime`
       })
     });
 
@@ -129,17 +129,29 @@ export class Schedule {
     Schedule.agenda.define('noti_cancel_booking_over_time', async (job: any) => {
       const data = job.attrs.data;
       const atransaction: any = await self.transactionRepository.findById(data.id, { include: [{ relation: 'bookings' }, { relation: 'room', scope: { include: [{ relation: 'coworking', scope: { include: [{ relation: 'user' }] } }] } }, { relation: 'user' }] });
-      if (!atransaction || atransaction.check_out || data.update_at.getTime() != atransaction.update_at.getTime()) return;
-      atransaction.status = MyDefault.TRANSACTION_STATUS.CANCELLED;
-      self.transactionRepository.bookings(atransaction.id).patch({ status: MyDefault.BOOKING_STATUS.CANCELLED })
-      FireBase.sendMulti(atransaction.room.coworking?.user?.firebase_token as any, {
-        title: `[Cancel booking] Đã hủy booking #${atransaction.booking_reference}`,
-        body: `Khách hàng không check-in trong thời gian đặt phòng`
-      })
-      FireBase.sendMulti(atransaction.user.firebase_token, {
-        title: `Đã hủy booking #${atransaction.booking_reference}`,
-        body: `Booking #${atransaction.booking_reference} đã được hủy do quá thời gian check-in`
-      })
+      if (!atransaction || data.update_at.getTime() != atransaction.update_at.getTime()) return;
+      if (atransaction.check_in) {
+        atransaction.status = MyDefault.TRANSACTION_STATUS.SUCCESS;
+        let user = await self.userRepository.findById(atransaction.userId);
+        user.list_exchange_point?.push({ createAt: new Date(), point: parseInt((atransaction.price / MoneyToCoin) + '') })
+        user.point += parseInt((atransaction.price / MoneyToCoin) + '');
+        await self.userRepository.update(user);
+        FireBase.sendMulti(user.firebase_token, {
+          title: `Thưởng point #${atransaction.booking_reference}`,
+          body: `Bạn được thưởng ${parseInt((atransaction.price / MoneyToCoin) + '')} cho booking #${atransaction.booking_reference}`
+        })
+      } else {
+        atransaction.status = MyDefault.TRANSACTION_STATUS.CANCELLED;
+        self.transactionRepository.bookings(atransaction.id).patch({ status: MyDefault.BOOKING_STATUS.CANCELLED })
+        FireBase.sendMulti(atransaction.room.coworking?.user?.firebase_token as any, {
+          title: `[Cancel booking] Cacncel booking #${atransaction.booking_reference}`,
+          body: `Booking #${atransaction.booking_reference} is canceled due to overtime`
+        })
+        FireBase.sendMulti(atransaction.user.firebase_token, {
+          title: `Your booking canceled #${atransaction.booking_reference}`,
+          body: `Booking #${atransaction.booking_reference} is canceled due to overtime`
+        })
+      }
       delete atransaction.room;
       delete atransaction.user;
       delete atransaction.bookings;

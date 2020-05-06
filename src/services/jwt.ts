@@ -20,7 +20,7 @@ export class JWTService implements TokenService {
 
   async verifyToken(token: string): Promise<UserProfile> {
     if (!token) {
-      throw new AppResponse(400, `Error verifying token : 'token' is null`);
+      throw new AppResponse(401, `Error verifying token : 'token' is null`);
     }
 
     let userProfile: UserProfile;
@@ -28,7 +28,6 @@ export class JWTService implements TokenService {
     try {
       // decode user profile from token
       const decodedToken = await verifyAsync(token, this.jwtSecret);
-      // don't copy over  token field 'iat' and 'exp', nor 'email' to user profile
       userProfile = Object.assign(
         { [securityId]: '', email: '' },
         {
@@ -39,14 +38,14 @@ export class JWTService implements TokenService {
         },
       );
     } catch (error) {
-      throw new AppResponse(400, `Error verifying token : ${error.message}`);
+      throw new AppResponse(401, `Error verifying token : ${error.message}`);
     }
     return userProfile;
   }
 
   async generateToken(userProfile: UserProfile): Promise<string> {
     if (!userProfile) {
-      throw new AppResponse(400, 'Error generating token : userProfile is null');
+      throw new AppResponse(401, 'Error generating token : userProfile is null');
     }
     const userInfoForToken = {
       id: userProfile[securityId],
@@ -60,7 +59,7 @@ export class JWTService implements TokenService {
         expiresIn: Number(this.jwtExpiresIn),
       });
     } catch (error) {
-      throw new AppResponse(400, `Error encoding token : ${error}`);
+      throw new AppResponse(401, `Error encoding token : ${error}`);
     }
 
     return token;

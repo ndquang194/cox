@@ -82,13 +82,13 @@ export class User extends Entity {
     type: 'number',
     default: 0,
   })
-  point?: number;
+  point: number;
 
   @property({
     type: 'number',
     default: 0,
   })
-  coin?: number;
+  coin: number;
 
   @property({
     type: 'array',

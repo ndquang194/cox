@@ -5,6 +5,35 @@ import { User } from '../models';
 import { Credentials } from '../repositories';
 const path = require('path');
 
+const unicode = [
+  "aAàÀảẢãÃáÁạẠăĂằẰẳẲẵẴắẮặẶâÂầẦẩẨẫẪấẤậẬ",
+  "bB",
+  "cC",
+  "dDđĐ",
+  "eEèÈẻẺẽẼéÉẹẸêÊềỀểỂễỄếẾệỆ",
+  "fF",
+  "gG",
+  "hH",
+  "iIìÌỉỈĩĨíÍịỊ",
+  "jJ",
+  "kK",
+  "lL",
+  "mM",
+  "nN",
+  "oOòÒỏỎõÕóÓọỌôÔồỒổỔỗỖốỐộỘơƠờỜởỞỡỠớỚợỢ",
+  "pP",
+  "qQ",
+  "rR",
+  "sS",
+  "tT",
+  "uUùÙủỦũŨúÚụỤưƯừỪửỬữỮứỨựỰ",
+  "vV",
+  "wW",
+  "xX",
+  "yYỳỲỷỶỹỸýÝỵỴ",
+  "zZ"
+]
+
 export namespace TokenServiceConstants {
   export const TOKEN_SECRET_VALUE = 'myjwts3cr3t';
   export const TOKEN_EXPIRES_IN_VALUE = '' + 10 * 365 * 24 * 60 * 60;
@@ -46,3 +75,16 @@ export namespace Path {
 }
 
 export const CoinServer = 'http://dev.coinserver.unox.site';
+export const PointToCoin = 20000;
+export const MoneyToCoin = 1000;
+
+export function unicodeToAscii(str: string) {
+  const strArr = str.split('');
+  for (let i = 0; i < str.length; i++) {
+    let char = unicode.find(x => { return x.includes(str[i]) });
+    if (char != undefined) {
+      strArr.splice(i, 1, `[${char}]`);
+    }
+  }
+  return strArr.join('');
+}

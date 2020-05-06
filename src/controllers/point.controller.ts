@@ -24,7 +24,7 @@ import {
 import { UserRepository, Credentials } from '../repositories';
 import { inject } from '@loopback/core';
 import { TokenService, UserService, authenticate } from '@loopback/authentication';
-import { UserServiceBindings, CoinServer, TokenServiceBindings } from '../services/key';
+import { UserServiceBindings, CoinServer, TokenServiceBindings, PointToCoin } from '../services/key';
 import { User, Card } from '../models';
 import { SecurityBindings, securityId, UserProfile } from '@loopback/security';
 import { AppResponse } from '../services/appresponse';
@@ -78,12 +78,11 @@ export class PointController {
       throw new AppResponse(400, 'Error point');
     if (user.point < request.point)
       throw new AppResponse(400, 'Not enough point');
-    let coin = request.point / 1000;
+    let coin = request.point / PointToCoin;
     const form = new URLSearchParams();
     form.append('email', user.email);
     form.append('coin', coin + '');
     const res = (await Axios.post(`${CoinServer}/addCoin`, form)).data;
-    console.log(res);
     if (res && res.coin != undefined && res.updatedAt != undefined) {
       user.point -= request.point;
       let date = new Date();
@@ -127,8 +126,8 @@ export class PointController {
       },
     }) request: { coin: number, address: string }
   ): Promise<AppResponse> {
-    let user = await this.userRepository.findById(currentUserProfile[securityId]);
-    const coin: any = this.getCoin(user);
+    let user: User = await this.userRepository.findById(currentUserProfile[securityId]);
+    const coin: any = await this.getCoin(user);
     if (!request.address)
       throw new AppResponse(400, 'address not found');
     if (!coin || !user.coin || !request.coin || request.coin <= 0)
@@ -137,14 +136,14 @@ export class PointController {
       throw new AppResponse(400, 'Not enough point');
     const form = new URLSearchParams();
     form.append('email', user.email);
-    form.append('coin', coin + '');
-    form.append('address', request.address + '');
+    form.append('coin', request.coin + '');
+    form.append('address', request.address);
     const res = (await Axios.post(`${CoinServer}/withdrawEth`, form)).data;
     if (res && res.status == 'done' && res.transaction_hash) {
       user.coin -= request.coin;
       user.list_exchange_coin?.push({ transaction_hash: res.transaction_hash, createAt: new Date(), coin: -request.coin });
       this.userRepository.update(user);
-      return new AppResponse(200, 'Success', { ...res.transaction_hash });
+      return new AppResponse(200, 'Success', { transaction_hash: res.transaction_hash });
     } else {
       throw new AppResponse(400, 'Cannot withdraw coin');
     }
@@ -173,6 +172,8 @@ export class PointController {
       },
     }) card: Card
   ): Promise<AppResponse> {
+    if (!card.name || card.name == '' || !card.address || card.address == '')
+      throw new AppResponse(400, "Missing field!");
     let user = await this.userRepository.findById(currentUserProfile[securityId]);
     const index = user.listCard.findIndex(e => e.name == card.name);
     if (index != -1)
@@ -195,6 +196,7 @@ export class PointController {
     },
   })
   async delCardByName(
+    @param.path.string('name') name: string,
     @inject(SecurityBindings.USER)
     currentUserProfile: UserProfile,
   ): Promise<AppResponse> {
@@ -215,11 +217,12 @@ export class PointController {
   @patch('/cards/{name}', {
     responses: {
       '200': {
-        description: 'Add card',
+        description: 'Edit card',
       },
     },
   })
   async editCart(
+    @param.path.string('name') name: string,
     @inject(SecurityBindings.USER)
     currentUserProfile: UserProfile,
     @requestBody({
@@ -235,13 +238,15 @@ export class PointController {
       },
     }) card: any
   ): Promise<AppResponse> {
+    if (!card.name || card.name == '')
+      throw new AppResponse(400, "Missing field!");
     let user = await this.userRepository.findById(currentUserProfile[securityId]);
     const index = user.listCard.findIndex(e => e.name == name);
     if (index == -1)
       throw new AppResponse(404, "Not found your card");
     user.listCard[index].name = card.name;
     await this.userRepository.update(user);
-    return new AppResponse(200, 'Success', user.listCard);
+    return new AppResponse(200, 'Success', user.listCard[index]);
   }
 
   @authenticate('jwt')
@@ -322,21 +327,20 @@ export class PointController {
   ): Promise<AppResponse> {
     let user = await this.userRepository.findById(currentUserProfile[securityId]);
     const coin = await this.getCoin(user);
-    if (!coin)
-      throw new AppResponse(500, 'Cannot get coin');
     user.coin = coin;
     return new AppResponse(200, 'Success', { current_coin: user.coin });
   }
 
   async getCoin(user: any) {
     const res = (await Axios.get(`${CoinServer}/getCoin`, { data: { email: user.email } })).data;
-    if (res && res.coin) {
+    if (res != undefined && res.coin != undefined) {
       if (res.coin != user.coin) {
         user.coin = res.coin;
         await this.userRepository.update(user);
       }
       return user.coin;
+    } else {
+      throw new AppResponse(400, 'Cannot get coin');
     }
-    else return undefined;
   }
 }

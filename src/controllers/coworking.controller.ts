@@ -26,7 +26,7 @@ import { authenticate, TokenService, UserService } from '@loopback/authenticatio
 import { inject } from '@loopback/context';
 import { SecurityBindings, securityId, UserProfile } from '@loopback/security';
 import { OPERATION_SECURITY_SPEC } from '../ultils/security-spec';
-import { PasswordHasherBindings, TokenServiceBindings, UserServiceBindings, Path } from '../services/key';
+import { PasswordHasherBindings, TokenServiceBindings, UserServiceBindings, Path, unicodeToAscii } from '../services/key';
 import { authorize } from '@loopback/authorization';
 import { basicAuthorization } from '../services/basic.authorizor';
 import { Coworking } from '../models';
@@ -134,6 +134,7 @@ export class CoworkingController {
     }));
   }
 
+  @authenticate('jwt')
   @get('/coworkings/{id}', {
     responses: {
       '200': {
@@ -150,6 +151,7 @@ export class CoworkingController {
   }
 
 
+  @authenticate('jwt')
   @get('/coworkings/near', {
     responses: {
       '200': {
@@ -161,16 +163,61 @@ export class CoworkingController {
     @param.query.number('maxDistance') maxDistance?: number,
     @param.query.number('lat') lat?: number,
     @param.query.number('lng') lng?: number,
+    @param.query.number('latCamera') latCamera?: number,
+    @param.query.number('lngCamera') lngCamera?: number,
   ): Promise<AppResponse> {
-    if (maxDistance == undefined || maxDistance < 0 || lat == undefined || lng == undefined || lat < -90 || lat > 90 || lng < -180 || lng > 180) throw new AppResponse(400, 'Missing field');
+    if (maxDistance == undefined || maxDistance < 0 || lat == undefined || lng == undefined || latCamera == undefined || lngCamera == undefined ||
+      lat < -90 || lat > 90 || latCamera < -90 || latCamera > 90 || lngCamera < -180 || lngCamera > 180 || lng < -180 || lng > 180)
+      throw new AppResponse(400, 'Missing field');
     const location = new loopback.GeoPoint(lat, lng);
+    const locationCamera = new loopback.GeoPoint(latCamera, lngCamera);
     const filter: any = {
       where: {
         location: {
-          near: location,
+          near: locationCamera,
           maxDistance: maxDistance,
           unit: 'kilometers'
         }
+      },
+      include: [{
+        relation: 'rooms'
+      }]
+    }
+    const coworkings = await this.coworkingRepository.find(filter);
+    let listCoworkings: any[] = [];
+    coworkings.forEach(element => {
+      const aElement: any = { ...element };
+      aElement.distance = loopback.GeoPoint.distanceBetween(location, new loopback.GeoPoint(element.location), { type: 'kilometers' });
+      listCoworkings.push(aElement);
+    });
+    return new AppResponse(200, 'Success', listCoworkings);
+  }
+
+  @authenticate('jwt')
+  @get('/coworkings/search', {
+    responses: {
+      '200': {
+        description: 'Array of User model instances',
+      },
+    },
+  })
+  async search(
+    @param.query.string('key') key?: string,
+    @param.query.number('lat') lat?: number,
+    @param.query.number('lng') lng?: number,
+  ): Promise<AppResponse> {
+    if (key == undefined || key == '' || lat == undefined || lng == undefined || lat < -90 || lat > 90 || lng < -180 || lng > 180) throw new AppResponse(400, 'Missing field');
+    const location = new loopback.GeoPoint(lat, lng);
+    key = unicodeToAscii(key);
+    const filter: any = {
+      where:
+      {
+        or: [{
+          name: { like: `.*${key}.*` }
+        },
+        {
+          address: { like: `.*${key}.*` }
+        }]
       },
       include: [{
         relation: 'rooms'
