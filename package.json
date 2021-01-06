@@ -59,7 +59,7 @@
     "@types/axios": "^0.14.0",
     "@types/bcryptjs": "^2.4.2",
     "agenda": "^3.0.0",
-    "axios": "^0.19.2",
+    "axios": "^0.21.1",
     "bcryptjs": "^2.4.3",
     "firebase-admin": "^8.10.0",
     "jsonwebtoken": "^8.5.1",
